@@ -14,8 +14,18 @@ class MatchResult:
     confidence: float = 0.0
     label: str = ""
 
+def escalas_por_resolucion(h_screen: int) -> list[float]:
+    base = 1080
+    exact = h_screen / base
+    # Prueba la escala exacta + margen de +-15% en pasos finos
+    scales = sorted(set(
+        [exact] +
+        list(np.linspace(exact * 0.85, exact * 1.15, 12))
+    ))
+    return scales
+
 class TemplateMatcher:
-    def __init__(self, templates_dir: str = "templates", threshold: float = 0.80):
+    def __init__(self, templates_dir: str = "templates", threshold: float = 0.75):
         self.threshold = threshold
         self.templates_dir = Path(templates_dir)
         self.templates: dict[str, list[np.ndarray]] = {}
@@ -41,10 +51,7 @@ class TemplateMatcher:
         h_screen, w_screen = gray.shape
         best = MatchResult(found=False, label=label)
 
-        # Escalas — incluye 1.0 explicitamente
-        scales = sorted(set(
-            list(np.linspace(0.5, 1.5, 20)) + [1.0]
-        ))
+        scales = escalas_por_resolucion(h_screen)
 
         for template in self.templates[label.lower()]:
             th, tw = template.shape
@@ -71,6 +78,10 @@ class TemplateMatcher:
                         confidence=round(float(max_val), 4),
                         label=label
                     )
+
+                # Si ya tenemos confianza perfecta, no seguimos
+                if best.confidence >= 0.99:
+                    return best
 
         return best if best.found else None
 
